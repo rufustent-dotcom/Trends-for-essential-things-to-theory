@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Monetization Analytics Dashboard",
+  "description": "Premium analytics \u0026 payment optimization dashboard for AI Agent Hub developer ecosystems.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
