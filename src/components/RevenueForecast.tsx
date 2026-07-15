@@ -42,17 +42,12 @@ interface ForecastPoint {
   projectedMrr: number;
   projectedCumulative: number;
   projectedSubscribers: number;
-  mrrWorst: number;
-  mrrBest: number;
-  cumulativeWorst: number;
-  cumulativeBest: number;
 }
 
 export default function RevenueForecast({ metrics }: RevenueForecastProps) {
   // Configurable Projection Parameters
   const [timelineMonths, setTimelineMonths] = useState<number>(12);
   const [growthRatePercent, setGrowthRatePercent] = useState<number>(8.5); // Default MoM growth matching predictable MRR index conversion rate
-  const [uncertaintyMargin, setUncertaintyMargin] = useState<number>(2.5); // Default MoM uncertainty variance (±2.5%)
   const [viewMetric, setViewMetric] = useState<"dual" | "mrr" | "cumulative">("dual");
 
   // Canvas Dimensions tracking (via ResizeObserver)
@@ -95,7 +90,6 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
   const baseGross = metrics.grossEarnings || 14850.50;
   const baseSubs = metrics.activeSubscriptions || 112;
   const growthRateFactor = growthRatePercent / 100;
-  const uncertaintyFactor = uncertaintyMargin / 100;
 
   const today = new Date();
   const allData: ForecastPoint[] = [];
@@ -108,27 +102,13 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
     date: new Date(today.getFullYear(), today.getMonth(), 1),
     projectedMrr: baseMrr,
     projectedCumulative: baseGross,
-    projectedSubscribers: baseSubs,
-    mrrWorst: baseMrr,
-    mrrBest: baseMrr,
-    cumulativeWorst: baseGross,
-    cumulativeBest: baseGross
+    projectedSubscribers: baseSubs
   });
 
   // Calculate project intervals
   let rollingMrr = baseMrr;
   let rollingGross = baseGross;
   let rollingSubs = baseSubs;
-
-  let rollingWorstMrr = baseMrr;
-  let rollingWorstGross = baseGross;
-
-  let rollingBestMrr = baseMrr;
-  let rollingBestGross = baseGross;
-
-  // Let's use growth rates: worst is lesser growth, best is greater growth
-  const worstRateFactor = Math.max(0, growthRateFactor - uncertaintyFactor);
-  const bestRateFactor = growthRateFactor + uncertaintyFactor;
 
   for (let i = 1; i <= timelineMonths; i++) {
     const targetDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
@@ -138,23 +118,13 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
     rollingGross = rollingGross + rollingMrr;
     rollingSubs = Math.round(rollingSubs * (1 + growthRateFactor));
 
-    rollingWorstMrr = rollingWorstMrr * (1 + worstRateFactor);
-    rollingWorstGross = rollingWorstGross + rollingWorstMrr;
-
-    rollingBestMrr = rollingBestMrr * (1 + bestRateFactor);
-    rollingBestGross = rollingBestGross + rollingBestMrr;
-
     allData.push({
       monthIndex: i,
       monthLabel,
       date: targetDate,
       projectedMrr: parseFloat(rollingMrr.toFixed(2)),
       projectedCumulative: parseFloat(rollingGross.toFixed(2)),
-      projectedSubscribers: rollingSubs,
-      mrrWorst: parseFloat(rollingWorstMrr.toFixed(2)),
-      mrrBest: parseFloat(rollingBestMrr.toFixed(2)),
-      cumulativeWorst: parseFloat(rollingWorstGross.toFixed(2)),
-      cumulativeBest: parseFloat(rollingBestGross.toFixed(2))
+      projectedSubscribers: rollingSubs
     });
   }
 
@@ -182,14 +152,14 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
       .domain(d3.extent(allData, d => d.date) as [Date, Date])
       .range([0, boundsWidth]);
 
-    const mrrMax = d3.max(allData, d => d.mrrBest) || baseMrr;
+    const mrrMax = d3.max(allData, d => d.projectedMrr) || baseMrr;
     const yScaleMrr = d3.scaleLinear()
-      .domain([0, mrrMax * 1.1])
+      .domain([0, mrrMax * 1.15])
       .range([boundsHeight, 0]);
 
-    const accumMax = d3.max(allData, d => d.cumulativeBest) || baseGross;
+    const accumMax = d3.max(allData, d => d.projectedCumulative) || baseGross;
     const yScaleAccum = d3.scaleLinear()
-      .domain([0, accumMax * 1.1])
+      .domain([0, accumMax * 1.15])
       .range([boundsHeight, 0]);
 
     // Grid lines (yScaleMrr basis or yScaleAccum basis depending on selection)
@@ -253,52 +223,6 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
         .call(g => g.selectAll(".tick line").attr("stroke", "#334155"))
         .call(g => g.selectAll(".tick text").attr("fill", "#c084fc").attr("font-size", "10px"));
 
-      // MRR Confidence Interval Shaded Area
-      const mrrConfArea = d3.area<ForecastPoint>()
-        .x(d => xScale(d.date))
-        .y0(d => yScaleMrr(d.mrrWorst))
-        .y1(d => yScaleMrr(d.mrrBest))
-        .curve(d3.curveMonotoneX);
-
-      g.append("path")
-        .datum(allData)
-        .attr("class", "mrr-confidence-area")
-        .attr("d", mrrConfArea)
-        .attr("fill", "#a855f7")
-        .attr("fill-opacity", 0.08);
-
-      // MRR Best Bound Line
-      const mrrBestLine = d3.line<ForecastPoint>()
-        .x(d => xScale(d.date))
-        .y(d => yScaleMrr(d.mrrBest))
-        .curve(d3.curveMonotoneX);
-
-      g.append("path")
-        .datum(allData)
-        .attr("class", "mrr-best-line")
-        .attr("d", mrrBestLine)
-        .attr("fill", "none")
-        .attr("stroke", "#c084fc")
-        .attr("stroke-width", 1)
-        .attr("stroke-dasharray", "3,3")
-        .attr("stroke-opacity", 0.4);
-
-      // MRR Worst Bound Line
-      const mrrWorstLine = d3.line<ForecastPoint>()
-        .x(d => xScale(d.date))
-        .y(d => yScaleMrr(d.mrrWorst))
-        .curve(d3.curveMonotoneX);
-
-      g.append("path")
-        .datum(allData)
-        .attr("class", "mrr-worst-line")
-        .attr("d", mrrWorstLine)
-        .attr("fill", "none")
-        .attr("stroke", "#c084fc")
-        .attr("stroke-width", 1)
-        .attr("stroke-dasharray", "3,3")
-        .attr("stroke-opacity", 0.4);
-
       // MRR Area Fill
       const mrrAreaGenerator = d3.area<ForecastPoint>()
         .x(d => xScale(d.date))
@@ -340,52 +264,6 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
         .call(g => g.select(".domain").attr("stroke", "none"))
         .call(g => g.selectAll(".tick line").attr("stroke", "#334155"))
         .call(g => g.selectAll(".tick text").attr("fill", "#22d3ee").attr("font-size", "10px"));
-
-      // Cumulative Confidence Interval Shaded Area
-      const accumConfArea = d3.area<ForecastPoint>()
-        .x(d => xScale(d.date))
-        .y0(d => yScaleAccum(d.cumulativeWorst))
-        .y1(d => yScaleAccum(d.cumulativeBest))
-        .curve(d3.curveMonotoneX);
-
-      g.append("path")
-        .datum(allData)
-        .attr("class", "accum-confidence-area")
-        .attr("d", accumConfArea)
-        .attr("fill", "#06b6d4")
-        .attr("fill-opacity", 0.08);
-
-      // Cumulative Best Bound Line
-      const accumBestLine = d3.line<ForecastPoint>()
-        .x(d => xScale(d.date))
-        .y(d => yScaleAccum(d.cumulativeBest))
-        .curve(d3.curveMonotoneX);
-
-      g.append("path")
-        .datum(allData)
-        .attr("class", "accum-best-line")
-        .attr("d", accumBestLine)
-        .attr("fill", "none")
-        .attr("stroke", "#06b6d4")
-        .attr("stroke-width", 1)
-        .attr("stroke-dasharray", "3,3")
-        .attr("stroke-opacity", 0.4);
-
-      // Cumulative Worst Bound Line
-      const accumWorstLine = d3.line<ForecastPoint>()
-        .x(d => xScale(d.date))
-        .y(d => yScaleAccum(d.cumulativeWorst))
-        .curve(d3.curveMonotoneX);
-
-      g.append("path")
-        .datum(allData)
-        .attr("class", "accum-worst-line")
-        .attr("d", accumWorstLine)
-        .attr("fill", "none")
-        .attr("stroke", "#06b6d4")
-        .attr("stroke-width", 1)
-        .attr("stroke-dasharray", "3,3")
-        .attr("stroke-opacity", 0.4);
 
       // Cumulative Area Fill
       const accumAreaGenerator = d3.area<ForecastPoint>()
@@ -514,17 +392,12 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
         baselineGross: baseGross,
         baselineActiveSubscribers: baseSubs,
         growthRateMoM: `${growthRatePercent}%`,
-        uncertaintyMarginMoM: `±${uncertaintyMargin}%`,
         projectionDurationMonths: timelineMonths
       },
       summaryMetrics: {
         projectedEndingMrr: targetOutput.projectedMrr,
-        projectedEndingMrrWorstCase: targetOutput.mrrWorst,
-        projectedEndingMrrBestCase: targetOutput.mrrBest,
         projectedEndingSubscribers: targetOutput.projectedSubscribers,
         projectedCumulativeGrossRun: cumulativeEarningsResult,
-        projectedCumulativeGrossWorstCase: targetOutput.cumulativeWorst,
-        projectedCumulativeGrossBestCase: targetOutput.cumulativeBest,
         netEcosystemGrossGrowth: parseFloat((cumulativeEarningsResult - baseGross).toFixed(2)),
         mrrOverallGrowthPercent: `${mrrIncreasePercent}%`
       },
@@ -533,11 +406,7 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
         monthLabel: point.monthLabel,
         targetDate: point.date.toISOString().split('T')[0],
         projectedMrr: point.projectedMrr,
-        mrrWorstCase: point.mrrWorst,
-        mrrBestCase: point.mrrBest,
         projectedCumulative: point.projectedCumulative,
-        cumulativeWorstCase: point.cumulativeWorst,
-        cumulativeBestCase: point.cumulativeBest,
         projectedSubscribers: point.projectedSubscribers
       }))
     };
@@ -548,7 +417,7 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
     
     const link = document.createElement("a");
     link.href = url;
-    link.download = `revenue_forecast_${timelineMonths}m_${growthRatePercent.toFixed(1)}pct_mom_ci.json`;
+    link.download = `revenue_forecast_${timelineMonths}m_${growthRatePercent.toFixed(1)}pct_mom.json`;
     document.body.appendChild(link);
     link.click();
     
@@ -601,7 +470,7 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
           <button
             onClick={handleExportJson}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-850 hover:bg-slate-800 hover:text-purple-400 text-slate-400 text-xxs font-bold uppercase tracking-wider transition-all duration-155 cursor-pointer hover:border-purple-500/30 active:scale-95 duration-100"
-            title="Export Month-by-Month Forecast and Confidence Ranges to JSON"
+            title="Export Month-by-Month Forecast to JSON"
           >
             <Download className="w-3.5 h-3.5 text-purple-400" />
             <span>Export JSON</span>
@@ -610,7 +479,7 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
       </div>
 
       {/* Simulator Inputs Sliders (Grid) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-[#090d16]/30 p-4 border border-slate-850 rounded-2xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#090d16]/30 p-4 border border-slate-850 rounded-2xl">
         
         {/* Slider 1: Monthly Growth */}
         <div className="space-y-2">
@@ -662,31 +531,6 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
           </div>
         </div>
 
-        {/* Slider 3: Confidence Interval Uncertainty Margin */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center text-xs font-mono">
-            <span className="text-slate-400 font-bold uppercase flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-emerald-400" />
-              Confidence Band Variance
-            </span>
-            <span className="text-emerald-400 font-black">±{uncertaintyMargin.toFixed(1)}%</span>
-          </div>
-          <input
-            type="range"
-            min="0.5"
-            max="8.0"
-            step="0.5"
-            value={uncertaintyMargin}
-            onChange={(e) => setUncertaintyMargin(parseFloat(e.target.value))}
-            className="w-full accent-emerald-500 h-1 cursor-pointer bg-slate-800 rounded-lg outline-none"
-          />
-          <div className="flex justify-between text-[9px] text-slate-550 font-mono">
-            <span>±0.5% Narrow</span>
-            <span>±2.5% Standard</span>
-            <span>±8.0% High Vol</span>
-          </div>
-        </div>
-
       </div>
 
       {/* Target forecast KPI Projection cards */}
@@ -702,8 +546,8 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
           <div className="text-xl font-black text-slate-100 font-sans">
             ${targetOutput.projectedMrr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <p className="text-[10px] text-slate-500 font-medium font-sans flex flex-wrap gap-1">
-            <span className="text-emerald-400 font-bold">+{mrrIncreasePercent}% growth</span> over current MRR. Range: ${targetOutput.mrrWorst.toLocaleString(undefined, { maximumFractionDigits: 0 })}–${targetOutput.mrrBest.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          <p className="text-[10px] text-slate-500 font-medium font-sans flex items-center gap-1">
+            <span className="text-emerald-400 font-bold">+{mrrIncreasePercent}% growth</span> over current MRR basis.
           </p>
         </div>
 
@@ -718,7 +562,7 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
             ${cumulativeEarningsResult.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           <p className="text-[10px] text-slate-500 font-medium font-sans">
-            Range: ${targetOutput.cumulativeWorst.toLocaleString(undefined, { maximumFractionDigits: 0 })}–${targetOutput.cumulativeBest.toLocaleString(undefined, { maximumFractionDigits: 0 })} (${(cumulativeEarningsResult - baseGross).toLocaleString(undefined, { maximumFractionDigits: 0 })} net gain).
+            Addition of <span className="text-slate-350 font-semibold">${(cumulativeEarningsResult - baseGross).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span> new ecosystem gross margin.
           </p>
         </div>
 
@@ -746,17 +590,17 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
             <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
             <span>Projected Growth Timeline Run Chart</span>
           </div>
-          <div className="flex flex-wrap items-center gap-4 text-[10px] font-mono">
+          <div className="flex items-center gap-4 text-[10px] font-mono">
             {(viewMetric === "dual" || viewMetric === "mrr") && (
               <span className="flex items-center gap-1.5 text-purple-400 font-bold">
-                <span className="w-2 h-2 rounded bg-[#a855f7]/20 border border-[#a855f7]/40"></span>
-                MRR [±{uncertaintyMargin.toFixed(1)}% Compounded Bounds]
+                <span className="w-2 h-2 rounded-full bg-[#a855f7]"></span>
+                Projected Monthly MRR
               </span>
             )}
             {(viewMetric === "dual" || viewMetric === "cumulative") && (
               <span className="flex items-center gap-1.5 text-cyan-400 font-bold">
-                <span className="w-2 h-2 rounded bg-[#06b6d4]/20 border border-[#06b6d4]/40"></span>
-                Cumulative [±{uncertaintyMargin.toFixed(1)}% Compounded Bounds]
+                <span className="w-2 h-2 rounded-full bg-[#06b6d4]"></span>
+                Projected Cumulative Gross
               </span>
             )}
           </div>
@@ -775,7 +619,7 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
           {/* D3-driven Floating Interactive HTML Tooltip */}
           {activeDataPoint && hoverPosition && (
             <div 
-              className="absolute z-20 pointer-events-none bg-slate-950/95 border border-slate-750 p-3 rounded-xl shadow-lg space-y-1.5 shrink-0 min-w-[200px] font-sans text-left transition-all duration-75"
+              className="absolute z-20 pointer-events-none bg-slate-950/95 border border-slate-750 p-3 rounded-xl shadow-lg space-y-1.5 shrink-0 max-w-xs font-sans text-left transition-all duration-75"
               style={{
                 left: `${hoverPosition.x - (containerRef.current?.getBoundingClientRect().left || 0)}px`,
                 top: `${hoverPosition.y - (containerRef.current?.getBoundingClientRect().top || 0)}px`,
@@ -786,42 +630,26 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
                 <span className="text-white font-semibold">{activeDataPoint.monthLabel}</span>
               </div>
               
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 {(viewMetric === "dual" || viewMetric === "mrr") && (
-                  <div className="space-y-0.5">
-                    <div className="flex justify-between gap-6 text-[11px]">
-                      <span className="text-slate-400 font-medium">Monthly MRR:</span>
-                      <span className="text-purple-400 font-bold font-mono">
-                        ${activeDataPoint.projectedMrr.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between gap-4 text-[9px] text-slate-500 font-mono">
-                      <span>Bounds:</span>
-                      <span>
-                        ${activeDataPoint.mrrWorst.toLocaleString(undefined, { maximumFractionDigits: 0 })} – ${activeDataPoint.mrrBest.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                      </span>
-                    </div>
+                  <div className="flex justify-between gap-6 text-[11px]">
+                    <span className="text-slate-400 font-medium">Monthly MRR:</span>
+                    <span className="text-purple-400 font-bold font-mono">
+                      ${activeDataPoint.projectedMrr.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
                   </div>
                 )}
                 
                 {(viewMetric === "dual" || viewMetric === "cumulative") && (
-                  <div className="space-y-0.5 border-t border-slate-850/60 pt-1">
-                    <div className="flex justify-between gap-6 text-[11px]">
-                      <span className="text-slate-400 font-medium font-sans">Cumulative:</span>
-                      <span className="text-cyan-400 font-bold font-mono">
-                        ${activeDataPoint.projectedCumulative.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between gap-4 text-[9px] text-slate-500 font-mono">
-                      <span>Bounds:</span>
-                      <span>
-                        ${activeDataPoint.cumulativeWorst.toLocaleString(undefined, { maximumFractionDigits: 0 })} – ${activeDataPoint.cumulativeBest.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                      </span>
-                    </div>
+                  <div className="flex justify-between gap-6 text-[11px]">
+                    <span className="text-slate-400 font-medium">Accumulative:</span>
+                    <span className="text-cyan-400 font-bold font-mono">
+                      ${activeDataPoint.projectedCumulative.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
                   </div>
                 )}
 
-                <div className="flex justify-between gap-6 text-[11px] border-t border-slate-850/60 pt-1">
+                <div className="flex justify-between gap-6 text-[11px]">
                   <span className="text-slate-400 font-medium">Active Subs:</span>
                   <span className="text-emerald-400 font-mono font-semibold">
                     {activeDataPoint.projectedSubscribers} Devs
@@ -834,7 +662,7 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
         
         <p className="text-[9.5px] text-slate-505 text-slate-500 font-mono text-center flex items-center justify-center gap-1 bg-slate-900/10 p-1 rounded-lg">
           <Info className="w-3 h-3 text-slate-400 shrink-0" />
-          <span>Move cursor over the timeline grid to analyze exact computed balances and compounded confidence ranges at each interval node.</span>
+          <span>Move cursor over the timeline grid to analyze exact computed balances at each interval node.</span>
         </p>
       </div>
 
@@ -863,8 +691,8 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
               <tr>
                 <th className="px-4 py-2.5 text-center font-sans">Interval</th>
                 <th className="px-4 py-2.5 font-sans">Target Date</th>
-                <th className="px-4 py-2.5 text-right font-sans">Projected MRR &amp; Bounds</th>
-                <th className="px-4 py-2.5 text-right font-sans">cumulative Gross &amp; Bounds</th>
+                <th className="px-4 py-2.5 text-right font-sans">Projected MRR</th>
+                <th className="px-4 py-2.5 text-right font-sans">cumulative Gross</th>
                 <th className="px-4 py-2.5 text-center font-sans">Active Subscribers</th>
                 <th className="px-4 py-2.5 text-right font-sans">MoM Growth Gain</th>
               </tr>
@@ -888,18 +716,8 @@ export default function RevenueForecast({ metrics }: RevenueForecastProps) {
                   <tr key={index} className={rowClass}>
                     <td className="px-4 py-2 text-center text-slate-505 font-bold">+{point.monthIndex} M</td>
                     <td className="px-4 py-2 font-bold text-slate-300 font-sans">{point.monthLabel}</td>
-                    <td className="px-4 py-2 text-right font-bold text-purple-400">
-                      <div>${point.projectedMrr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                      <div className="text-[9px] text-slate-500 font-normal">
-                        [${point.mrrWorst.toLocaleString(undefined, { maximumFractionDigits: 0 })} – ${point.mrrBest.toLocaleString(undefined, { maximumFractionDigits: 0 })}]
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 text-right font-bold text-cyan-400">
-                      <div>${point.projectedCumulative.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                      <div className="text-[9px] text-slate-500 font-normal">
-                        [${point.cumulativeWorst.toLocaleString(undefined, { maximumFractionDigits: 0 })} – ${point.cumulativeBest.toLocaleString(undefined, { maximumFractionDigits: 0 })}]
-                      </div>
-                    </td>
+                    <td className="px-4 py-2 text-right font-bold text-purple-400">${point.projectedMrr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="px-4 py-2 text-right font-bold text-cyan-400">${point.projectedCumulative.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td className="px-4 py-2 text-center text-slate-300">{point.projectedSubscribers} users</td>
                     <td className="px-4 py-2 text-right text-emerald-400 font-bold">
                       {momGain > 0 ? (
