@@ -233,6 +233,19 @@ let skills = [
     salesCount: 220,
     earnings: 4500.00,
     status: "Active"
+  },
+  {
+    id: "skill-6",
+    name: "Gift of Skill — Word Puzzle Game",
+    description: "Tech-vocabulary word unscramble game bundled as a giftable AI skill module. 25-word lexicon covering AI, APIs, systems, and business terms.",
+    category: "Utility",
+    billingModel: "One-time Purchase",
+    price: 4.99,
+    unit: "lifetime access",
+    activeUsers: 640,
+    salesCount: 312,
+    earnings: 1556.88,
+    status: "Active"
   }
 ];
 
