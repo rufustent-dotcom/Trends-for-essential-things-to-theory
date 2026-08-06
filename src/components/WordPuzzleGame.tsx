@@ -117,21 +117,20 @@ export default function WordPuzzleGame() {
   }, []);
 
   // ── Advance to next round or end ───────────────────────────────────────
-  const advanceRound = useCallback((wasCorrect: boolean) => {
-    setRound(prev => {
-      const next = prev + 1;
-      if (next > ROUND_LIMIT) {
-        setGameState("result");
-        return prev;
-      }
-      setUsedWords(prevUsed => {
-        const newUsed = currentEntry ? [...prevUsed, currentEntry.word] : prevUsed;
-        loadNextRound(newUsed);
-        return newUsed;
-      });
-      return next;
-    });
-  }, [currentEntry, loadNextRound]);
+  const advanceRound = useCallback((_wasCorrect: boolean) => {
+    if (!currentEntry) return;
+
+    const next = round + 1;
+    if (next > ROUND_LIMIT) {
+      setGameState("result");
+      return;
+    }
+
+    const newUsed = [...usedWords, currentEntry.word];
+    setUsedWords(newUsed);
+    loadNextRound(newUsed);
+    setRound(next);
+  }, [currentEntry, loadNextRound, round, usedWords]);
 
   // ── Timeout handler ────────────────────────────────────────────────────
   const handleTimeout = useCallback(() => {
