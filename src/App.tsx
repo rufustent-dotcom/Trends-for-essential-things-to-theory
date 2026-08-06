@@ -42,7 +42,8 @@ import {
   Plus,
   Trash2,
   FileText,
-  HelpCircle
+  HelpCircle,
+  Gift
 } from "lucide-react";
 
 import { codeTemplates } from "./utils/codeTemplates";
@@ -54,6 +55,7 @@ import EcosystemHeatmap from "./components/EcosystemHeatmap";
 import StockAnalysisDemo from "./components/StockAnalysisDemo";
 import SubscriptionGrowthChart from "./components/SubscriptionGrowthChart";
 import RevenueAlertCenter from "./components/RevenueAlertCenter";
+import WordPuzzleGame from "./components/WordPuzzleGame";
 
 export default function App() {
   // Global App States from Backend Server
@@ -86,7 +88,7 @@ export default function App() {
   const [selectedSkillId, setSelectedSkillId] = useState<string>("");
 
   // Primary Workspace tab toggling
-  const [activeTab, setActiveTab ] = useState<"map" | "sandbox" | "finances" | "payments" | "stock">("map");
+  const [activeTab, setActiveTab ] = useState<"map" | "sandbox" | "finances" | "payments" | "stock" | "puzzle">("map");
 
   // User Management and Interactive simulated checkout states
   const [users, setUsers] = useState<any[]>([]);
@@ -548,7 +550,7 @@ export default function App() {
               <span>Developer Monetization Portals</span>
               <span className="text-slate-500 font-thin">|</span>
               <span className="text-slate-350 text-sm font-semibold tracking-wide font-sans">
-                {activeTab === 'map' ? "Patterns & Signals causality map" : activeTab === 'sandbox' ? "API Sandbox Console" : activeTab === 'finances' ? "Revenue Analytics" : activeTab === 'payments' ? "Premium Skill Analytics & Payment Integration" : "Manus Stock Analysis Skill Demonstration"}
+                {activeTab === 'map' ? "Patterns & Signals causality map" : activeTab === 'sandbox' ? "API Sandbox Console" : activeTab === 'finances' ? "Revenue Analytics" : activeTab === 'payments' ? "Premium Skill Analytics & Payment Integration" : activeTab === 'puzzle' ? "Gift of Skill — Word Puzzle Game" : "Manus Stock Analysis Skill Demonstration"}
               </span>
             </h1>
           </div>
@@ -604,6 +606,16 @@ export default function App() {
               >
                 <Briefcase className="w-3.5 h-3.5 text-blue-400" />
                 <span>Stock Analysis</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("puzzle")}
+                className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'puzzle' ? "bg-slate-900 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <Gift className="w-3.5 h-3.5 text-purple-400" />
+                <span>Word Puzzle</span>
               </button>
             </div>
 
@@ -2201,6 +2213,18 @@ export default function App() {
               transition={{ duration: 0.2 }}
             >
               <StockAnalysisDemo />
+            </motion.div>
+          )}
+
+          {activeTab === "puzzle" && (
+            <motion.div
+              key="puzzle-view"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <WordPuzzleGame />
             </motion.div>
           )}
 
