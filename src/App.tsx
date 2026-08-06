@@ -550,7 +550,7 @@ export default function App() {
               <span>Developer Monetization Portals</span>
               <span className="text-slate-500 font-thin">|</span>
               <span className="text-slate-350 text-sm font-semibold tracking-wide font-sans">
-                {activeTab === 'map' ? "Patterns & Signals causality map" : activeTab === 'sandbox' ? "API Sandbox Console" : activeTab === 'finances' ? "Revenue Analytics" : activeTab === 'payments' ? "Premium Skill Analytics & Payment Integration" : activeTab === 'puzzle' ? "Gift of Skill — Word Puzzle Game" : "Manus Stock Analysis Skill Demonstration"}
+                {({ map: "Patterns & Signals causality map", sandbox: "API Sandbox Console", finances: "Revenue Analytics", payments: "Premium Skill Analytics & Payment Integration", puzzle: "Gift of Skill — Word Puzzle Game", stock: "Manus Stock Analysis Skill Demonstration" } as const)[activeTab]}
               </span>
             </h1>
           </div>
