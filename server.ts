@@ -244,7 +244,7 @@ let skills = [
     unit: "lifetime access",
     activeUsers: 640,
     salesCount: 312,
-    earnings: 1558.00,
+    earnings: 1556.88,
     status: "Active"
   }
 ];
