@@ -116,32 +116,6 @@ export default function WordPuzzleGame() {
     setTimeout(() => inputRef.current?.focus(), 80);
   }, []);
 
-  // ── Timer tick ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (gameState !== "playing" || feedback) return;
-    timerRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current!);
-          handleTimeout();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timerRef.current!);
-  }, [gameState, feedback, currentEntry]);
-
-  // ── Timeout handler ────────────────────────────────────────────────────
-  const handleTimeout = useCallback(() => {
-    if (!currentEntry) return;
-    clearInterval(timerRef.current!);
-    setFeedback("timeout");
-    setStreak(0);
-    setRoundHistory(prev => [...prev, { word: currentEntry.word, guessed: input, correct: false, timeUsed: SECONDS_PER_ROUND }]);
-    setTimeout(() => advanceRound(false), 1800);
-  }, [currentEntry, input]);
-
   // ── Advance to next round or end ───────────────────────────────────────
   const advanceRound = useCallback((wasCorrect: boolean) => {
     setRound(prev => {
@@ -158,6 +132,38 @@ export default function WordPuzzleGame() {
       return next;
     });
   }, [currentEntry, loadNextRound]);
+
+  // ── Timeout handler ────────────────────────────────────────────────────
+  const handleTimeout = useCallback(() => {
+    if (!currentEntry) return;
+    clearInterval(timerRef.current!);
+    setFeedback("timeout");
+    setStreak(0);
+    setRoundHistory(prev => [...prev, { word: currentEntry.word, guessed: input, correct: false, timeUsed: SECONDS_PER_ROUND }]);
+    setTimeout(() => advanceRound(false), 1800);
+  }, [currentEntry, input, advanceRound]);
+
+  // ── Timer tick ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (gameState !== "playing" || feedback) return;
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timerRef.current!);
+  }, [gameState, feedback, currentEntry]);
+
+  // ── Trigger timeout when timer reaches 0 ──────────────────────────────
+  useEffect(() => {
+    if (gameState === "playing" && !feedback && timeLeft === 0) {
+      handleTimeout();
+    }
+  }, [timeLeft, gameState, feedback, handleTimeout]);
 
   // ── Submit answer ──────────────────────────────────────────────────────
   const handleSubmit = useCallback((e?: React.FormEvent) => {
@@ -286,7 +292,7 @@ export default function WordPuzzleGame() {
               <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1">
                 <Star className="w-4 h-4 text-amber-400 mx-auto" />
                 <div className="font-bold text-slate-200">Max score</div>
-                <div className="text-[10px] text-slate-500">~{ROUND_LIMIT * (20 + SECONDS_PER_ROUND + 10)} pts</div>
+                <div className="text-[10px] text-slate-500">~{ROUND_LIMIT * 50}+ pts</div>
               </div>
             </div>
 
@@ -321,7 +327,7 @@ export default function WordPuzzleGame() {
             </div>
 
             {/* Puzzle card */}
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-7 flex flex-col items-center gap-6">
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-7 flex flex-col items-center gap-6 relative">
 
               {/* Meta row */}
               <div className="w-full flex items-center justify-between text-[10px] font-mono">
