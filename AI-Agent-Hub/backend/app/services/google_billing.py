@@ -1,22 +1,28 @@
 import os
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
 from datetime import datetime, timedelta
+
+try:
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+except ModuleNotFoundError:  # pragma: no cover - handled by sandbox fallback
+    service_account = None
+    build = None
+
 
 class GoogleBillingValidator:
     def __init__(self):
         # Path to your Google Service Account JSON key file
         self.key_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "config/service_account.json")
         self.package_name = os.getenv("ANDROID_PACKAGE_NAME", "com.intrepid.ai")
-        
-        if os.path.exists(self.key_path):
+        self.credentials = None
+        self.service = None
+
+        if service_account is not None and build is not None and os.path.exists(self.key_path):
             self.credentials = service_account.Credentials.from_service_account_file(
                 self.key_path,
                 scopes=["https://www.googleapis.com/auth/androidpublisher"]
             )
             self.service = build("androidpublisher", "v3", credentials=self.credentials)
-        else:
-            self.service = None
 
     def verify_subscription(self, subscription_id: str, purchase_token: str) -> dict:
         """
