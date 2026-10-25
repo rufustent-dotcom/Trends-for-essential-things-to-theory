@@ -43,7 +43,8 @@ import {
   Trash2,
   FileText,
   HelpCircle,
-  Gift
+  Gift,
+  Trophy
 } from "lucide-react";
 
 import { codeTemplates } from "./utils/codeTemplates";
@@ -56,6 +57,7 @@ import StockAnalysisDemo from "./components/StockAnalysisDemo";
 import SubscriptionGrowthChart from "./components/SubscriptionGrowthChart";
 import RevenueAlertCenter from "./components/RevenueAlertCenter";
 import WordPuzzleGame from "./components/WordPuzzleGame";
+import TopTenLeaderboard from "./components/TopTenLeaderboard";
 
 export default function App() {
   // Global App States from Backend Server
@@ -88,7 +90,7 @@ export default function App() {
   const [selectedSkillId, setSelectedSkillId] = useState<string>("");
 
   // Primary Workspace tab toggling
-  const [activeTab, setActiveTab ] = useState<"map" | "sandbox" | "finances" | "payments" | "stock" | "puzzle">("map");
+  const [activeTab, setActiveTab ] = useState<"map" | "sandbox" | "finances" | "payments" | "stock" | "puzzle" | "top10">("map");
 
   // User Management and Interactive simulated checkout states
   const [users, setUsers] = useState<any[]>([]);
@@ -550,7 +552,7 @@ export default function App() {
               <span>Developer Monetization Portals</span>
               <span className="text-slate-500 font-thin">|</span>
               <span className="text-slate-350 text-sm font-semibold tracking-wide font-sans">
-                {({ map: "Patterns & Signals causality map", sandbox: "API Sandbox Console", finances: "Revenue Analytics", payments: "Premium Skill Analytics & Payment Integration", puzzle: "Gift of Skill — Word Puzzle Game", stock: "Manus Stock Analysis Skill Demonstration" } as const)[activeTab]}
+                {({ map: "Patterns & Signals causality map", sandbox: "API Sandbox Console", finances: "Revenue Analytics", payments: "Premium Skill Analytics & Payment Integration", puzzle: "Gift of Skill — Word Puzzle Game", stock: "Manus Stock Analysis Skill Demonstration", top10: "Top 10 Skill Rankings Leaderboard" } as const)[activeTab]}
               </span>
             </h1>
           </div>
@@ -616,6 +618,16 @@ export default function App() {
               >
                 <Gift className="w-3.5 h-3.5 text-purple-400" />
                 <span>Word Puzzle</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("top10")}
+                className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'top10' ? "bg-slate-900 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <Trophy className="w-3.5 h-3.5 text-yellow-400" />
+                <span>Top 10</span>
               </button>
             </div>
 
@@ -2225,6 +2237,18 @@ export default function App() {
               transition={{ duration: 0.2 }}
             >
               <WordPuzzleGame />
+            </motion.div>
+          )}
+
+          {activeTab === "top10" && (
+            <motion.div
+              key="top10-view"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <TopTenLeaderboard skills={skills} />
             </motion.div>
           )}
 
